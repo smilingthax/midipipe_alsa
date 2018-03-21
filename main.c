@@ -79,6 +79,31 @@ static int one_hex(unsigned char ch) // {{{
 }
 // }}}
 
+// initial state should be -1
+static int decode_hex_inplace(unsigned char *buf, int len, int *state) // {{{
+{
+  // assert(state);
+  unsigned const char *in=buf,*end=buf+len;
+  unsigned char *out=buf;
+  int nib=*state;
+  while (in<end) {
+    const int val=one_hex(*in++);
+    if (nib>=0) {
+      if (val<0) {
+        *out++=(nib&0xf);
+      } else {
+        *out++=((nib&0xf)<<4) | (val);
+      }
+      nib=-1;
+    } else {
+      nib=val;
+    }
+  }
+  *state=nib;
+  return out-buf;
+}
+// }}}
+
 static void hexdump(const unsigned char *buf, int len, int not_last) // {{{
 {
   int i;
@@ -250,7 +275,13 @@ int main(int argc, char **argv)
     }
   }
   if (usage) {
-    printf("Usage: %s [-l] [-h] [-i|-o] [-b] [device]\n", argv[0]);
+    printf("Usage: %s [-l] [-h] [-i|-o] [-b] [device]\n"
+           "  -l: List devices (can be combined with -i|-o)\n"
+           "  -i: Input from device only\n"
+           "  -o: Output to device only\n"
+           "  -b: Binary in-/output (instead of Hex)\n"
+           "  -h: Show Usage\n",
+           argv[0]);
     return 1;
   } else if (opt_list) {
     list_ports(opt_only);
@@ -416,22 +447,8 @@ int main(int argc, char **argv)
         if (opt_bin) {
           process_stdin(encoder, buf, ret, &sds);
         } else {
-          // inplace hex decode
-          int i,j;
-          for (i=0, j=0; i<ret; i++) {
-            if (stdin_hex>=0) {
-              int val=one_hex(buf[i]);
-              if (val<0) {
-                buf[j++]=(stdin_hex&0xf);
-              } else {
-                buf[j++]=((stdin_hex&0xf)<<4) | (val);
-              }
-              stdin_hex=-1;
-            } else {
-              stdin_hex=one_hex(buf[i]);
-            }
-          }
-          process_stdin(encoder, buf, j, &sds);
+          int len=decode_hex_inplace(buf, ret, &stdin_hex);
+          process_stdin(encoder, buf, len, &sds);
         }
       }
 
