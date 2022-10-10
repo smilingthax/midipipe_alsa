@@ -426,6 +426,10 @@ int main(int argc, char **argv)
     .own = &own
   };
 
+  if ( (opt_only!=2)&&(!opt_bin) ) {
+    setlinebuf(stdout); // otherwise non-ttys are block-buffered
+  }
+
   // main loop
   int stdin_hex=-1, active_sysex=0;
   while (!done) {
